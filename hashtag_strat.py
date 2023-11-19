@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 import os
 from instagrapi import Client
 from instagrapi.exceptions import LoginRequired
+from pathlib import Path
 import logging
 import random
 import json
@@ -14,17 +15,17 @@ cl = Client()
 
 # Load username and password
 load_dotenv()
-username = os.getenv('USERNAME')
-password = os.getenv('PASSWORD')
+username = os.environ['USERNAME']
+password = os.environ['PASSWORD']
 
 
 # Function definitions
 def login_user():
-    """""
+    """"
     Attempts to login to Instagram using either the provided session information
     """
 
-    session = cl.load_settings("session.json")
+    session = cl.load_settings(Path("session.json"))
 
     login_via_session = False
     login_via_pw = False
