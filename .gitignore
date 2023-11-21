@@ -1,2 +1,11 @@
 # env file
 .env
+
+# unused folder
+unused
+
+# gpt-4 tests
+testing.py
+
+# login session
+session.json

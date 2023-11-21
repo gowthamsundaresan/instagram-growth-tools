@@ -2,30 +2,46 @@ from dotenv import load_dotenv
 import os
 from instagrapi import Client
 from instagrapi.exceptions import LoginRequired
-from pathlib import Path
 import logging
 import random
-import json
+from openai import OpenAI
+import re
 
-# Init logger
+# Init logger and env
 logger = logging.getLogger()
+load_dotenv()
 
-# Init client
+# Init clients
 cl = Client()
+client = OpenAI()
 
 # Load username and password
-load_dotenv()
 username = os.environ['USERNAME']
 password = os.environ['PASSWORD']
 
 
 # Function definitions
 def login_user():
-    """"
-    Attempts to login to Instagram using either the provided session information
+    """
+    Attempts to log in to Instagram using session data if provided.
+    If not, attempts to login with username/password and then stores session data. 
+
+    Returns:
+    --------
+        None. The function updates the client's login state on success.
+
+    Raises:
+    -------
+        Exception: If login fails using both session data and username/password.
     """
 
-    session = cl.load_settings(Path("session.json"))
+    # Load session from file if session.json exists
+    if os.path.exists("session.json"):
+        session = cl.load_settings("session.json")
+
+    # Set session to None if session.json does not exist
+    else:
+        session = None
 
     login_via_session = False
     login_via_pw = False
@@ -34,13 +50,14 @@ def login_user():
         try:
             cl.set_settings(session)
             cl.login(username, password)
+            cl.delay_range = [3, 5]
 
             # Check if session is valid
             try:
                 cl.get_timeline_feed()
                 print("Logged in")
             except LoginRequired:
-                logger.info(
+                print(
                     "Session is invalid, need to login via username and password"
                 )
 
@@ -51,106 +68,211 @@ def login_user():
                 cl.set_uuids(old_session["uuids"])
 
                 cl.login(username, password)
+                cl.delay_range = [3, 5]
             login_via_session = True
         except Exception as e:
-            logger.info("Couldn't login user using session information: %s" %
-                        e)
+            print("Couldn't login user using session information: %s" % e)
 
     if not login_via_session:
+        # Login and store session
         try:
-            logger.info(
-                "Attempting to login via username and password. username: %s" %
+            print(
+                "Attempting to login via username and password. Username: %s" %
                 "getjoyroots")
             if cl.login(username, password):
                 login_via_pw = True
+                cl.dump_settings("session.json")
+                cl.delay_range = [3, 5]
         except Exception as e:
-            logger.info("Couldn't login user using username and password: %s" %
-                        e)
+            print("Couldn't login user using username and password: %s" % e)
 
     if not login_via_pw and not login_via_session:
         raise Exception("Couldn't login user with either password or session")
 
 
-def read_hashtag_cursors(file_path):
-    try:
-        with open(file_path, 'r') as file:
-            return json.load(file)
-    except FileNotFoundError:
-        return {}
-
-
-def save_hashtag_cursors(file_path, cursors):
-    with open(file_path, 'w') as file:
-        json.dump(cursors, file)
-
-
 def read_lines_from_file(file_path):
+    """
+    Reads lines from a file located at 'file_path'.
+
+    Parameters:
+    -----------
+        file_path : str
+            The path of the file to read from.
+
+    Returns:
+    --------
+        list of str
+            A list containing each line in the file as a separate string.
+    """
     with open(file_path, 'r') as file:
         return [line.strip() for line in file]
 
 
+def remove_emojis(text):
+    """
+    Removes all emoji characters from a given string uses a regex.
+    Covers a wide range of emojis, including emoticons, symbols, pictographs, transport and map symbols, flags, and more.
+
+    Parameters:
+    -----------
+    text : str
+        The input string from which emojis will be removed.
+
+    Returns:
+    --------
+    str
+        A new string with all emoji characters removed.
+    """
+
+    # Regex pattern to match all emoji characters
+    emoji_pattern = re.compile(
+        "["
+        u"\U0001F600-\U0001F64F"  # emoticons
+        u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+        u"\U0001F680-\U0001F6FF"  # transport & map symbols
+        u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+        u"\U00002702-\U000027B0"
+        u"\U000024C2-\U0001F251"
+        "]+",
+        flags=re.UNICODE)
+    return emoji_pattern.sub(r'', text)
+
+
 def hashtag_strategy():
     """
-    Based on certain hashtags, go comment on every 4th post
+    Executes the strategy of engaging with Instagram posts through specific hashtags.
+    It iterates through hashtags from hashtags.txt, selects posts at random, and either likes it or posts a comment generated by GPT-4.
+    In case a post doesn't have a caption, the function falls back on choosing a random comment from comments.txt
+
+    The function runs 200 actions and ensures that login is maintained throughout the process.
+
+    Returns:
+    --------
+        None. The function operates by interacting with Instagram posts and may output logs.
     """
 
     cl.delay_range = [1, 3]
+    print("Entered hashtag_strategy()")
+
     try:
-        print("Entered hashtag_strategy()")
-
-        # Setup comments from external file
+        # Setup comments and read hashtags
         comments = read_lines_from_file('comments.txt')
-
-        # Setup hashtags from external file
         hashtags = read_lines_from_file('hashtags.txt')
-
-        # Read cursors
-        cursors = read_hashtag_cursors('cursors.json')
+        random.shuffle(hashtags)
 
         # Setup limit variable
-        total_comments_posted = 0
+        total_actions = 0
 
-        # Iterate on hashtags from hashtags.txt and post a random comment from comments.txt on every 4th post
+        # Iterate over hashtags and comment on 3 random posts for each
         for hashtag in hashtags:
+            if total_actions >= 200:
+                break
+
             print(f"Processing hashtag: #{hashtag}")
 
-            cursor = cursors.get(hashtag)
-            medias, new_cursor = cl.hashtag_medias_v1_chunk(hashtag,
-                                                            max_amount=32,
-                                                            tab_key='recent',
-                                                            max_id=cursor)
-            cursors[hashtag] = new_cursor
-            save_hashtag_cursors('cursors.json', cursors)
+            # Fetch posts for the hashtag, up to 100
+            medias, new_cursor = cl.hashtag_medias_v1_chunk(
+                hashtag,
+                max_amount=100,
+                tab_key='recent',
+            )
 
             print(f"Number of posts retrieved for #{hashtag}: {len(medias)}")
 
-            for i in range(0, len(medias), 4):
-                if total_comments_posted >= 192:
-                    print("Reached 200 comments. Ending process.")
-                    return
+            cl.delay_range = [3, 5]
 
-                media = medias[i]
+            # Choose 1 random post
+            selected_posts = random.sample(medias, min(len(medias), 1))
+
+            # Perform action (like or comment) on the selected posts
+            for media in selected_posts:
+                if total_actions >= 200:
+                    break
+
+                action_type = random.choice(['like', 'comment'])
                 media_id = media.id
-                comment = cl.media_comment(media_id, random.choice(comments))
-                print(
-                    f"Commented on post with hashtag #{hashtag}: {comment.text}"
-                )
-                total_comments_posted += 1
+                media_pk = media.pk
 
-                cl.delay_range = [280, 320]
+                # Perform like action
+                if action_type == 'like':
+                    if cl.media_like(media_id):
+                        total_actions += 1
 
-            print(f"Completed posting on #{hashtag} posts")
+                        # Print update
+                        print(f"Liked post with ID {media_id}")
+                        print(f"Total actions: {total_actions}")
+                        print("Resting [240, 360]")
+                        cl.delay_range = [240, 360]
 
-        print("Reached 200 comments. Let's call it a day.")
+                # Perform comment action
+                else:
+                    # Fetch media information
+                    media_info = cl.media_info(media_pk).dict()
+                    caption = media_info.get('caption_text', '').strip()
+                    cl.delay_range = [3, 5]
+
+                    # Fallback to random comment from comments.txt if no caption
+                    if not caption:
+                        print(
+                            f"Commenting on post of ID {media.id} with no caption"
+                        )
+                        comments = read_lines_from_file('comments.txt')
+                        comment = random.choice(comments)
+
+                    # Generate a comment using gpt-4
+                    else:
+                        print(
+                            f"Commenting on post of ID {media.id} with caption: {caption}"
+                        )
+                        response = client.chat.completions.create(
+                            model="gpt-4",
+                            messages=[{
+                                "role":
+                                "system",
+                                "content":
+                                "You are the social media manager for a brand promoting mental wellness. Your role is to comment on Instagram posts in a way that's genuine and relatable. Don't be too positive just keep a netural tone. Don't be supportive or compliment the person. Avoid formal language. Don't be a nice guy, just be insightful and relatable. Use conversational phrases and millennial slang where appropriate. Draw on a range of real-life perspectives and experiences related to mental wellness. Each comment should be directly relevant to the post, ranging from 2 to 7 sentences. Don't use the person's username in the comment. Don't use exclamation marks. Don't use any hashtags."
+                            }, {
+                                "role":
+                                "user",
+                                "content":
+                                f"Write an engaging comment for an Instagram post with the caption given below. Reply to me only with the comment, nothing else. Don't enclose it in quotes. Don't use exclamation marks. Don't use any hashtags. Caption: '{caption}'"
+                            }])
+                        comment = response.choices[0].message.content
+                        comment = remove_emojis(comment)
+
+                    # Post comment
+                    posted_comment = cl.media_comment(media_id, comment)
+                    total_actions += 1
+
+                    # Print update
+                    print(
+                        f"Commented on post with hashtag #{hashtag}: {posted_comment.text}"
+                    )
+                    print(f"Total actions: {total_actions}")
+                    print("Resting [500, 1000]")
+                    cl.delay_range = [500, 1000]
+
+        # End of session
+        print("Reached 200 actions. Let's call it a day.")
 
     except LoginRequired:
+        # Re-login
         print("Logged out. Attempting to re-login.")
         login_user()
+
+        # Resume strategy
         print("Resuming strategy.")
         hashtag_strategy()
 
 
 def main():
+    """
+    Main function to execute the Instagram engagement script. Performs the login and then starts the hashtag engagement strategy.
+
+    Returns:
+    --------
+        None.
+    """
     # Login
     login_user()
     cl.delay_range = [1, 3]
