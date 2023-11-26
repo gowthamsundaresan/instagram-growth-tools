@@ -163,20 +163,25 @@ def hashtag_strategy():
     print("Entered hashtag_strategy()")
 
     try:
-        # Setup comments and read hashtags
+        # Read comments and randomize them
         comments = read_lines_from_file('comments.txt')
-        hashtags = read_lines_from_file('hashtags.txt')
-        random.shuffle(hashtags)
+        random.shuffle(comments)
+
+        # Get all hashtags, combine and randomize them
+        general_hashtags = read_lines_from_file('general_hashtags.txt')
+        expert_hashtags = read_lines_from_file('expert_hashtags.txt')
+        combined_hashtags = general_hashtags + expert_hashtags
+        random.shuffle(combined_hashtags)
 
         # Setup limit variable
         total_actions = 0
 
         # Setup conditions to perform action on a post
-        required_like_count = 20
-        required_comment_count = 10
+        required_like_count = 100
+        required_comment_count = 5
 
         # Iterate over hashtags and comment on 3 random posts for each
-        for hashtag in hashtags:
+        for hashtag in combined_hashtags:
             if total_actions >= 200:
                 break
 
@@ -234,8 +239,12 @@ def hashtag_strategy():
                 # Randomize what action would be taken
                 action_type = random.choice(['like', 'comment'])
 
+                # Get media info
                 media_id = selected_post.id
                 media_pk = selected_post.pk
+
+                # Check if hashtag is from expert list
+                is_expert_hashtag = hashtag in expert_hashtags
 
                 # Perform like action
                 if action_type == 'like':
@@ -271,23 +280,30 @@ def hashtag_strategy():
                         comments = read_lines_from_file('comments.txt')
                         comment = random.choice(comments)
 
-                    # Generate a comment using gpt-4
+                    # Generate a comment using GPT-4
                     else:
                         print(
                             f"Commenting on post of ID {media_id} with caption: {caption}"
                         )
+
+                        # Setup prompts for expert hashtags
+                        if is_expert_hashtag:
+                            system_message = "You are the social media manager for a brand promoting alternative natural supplements. Your role is to comment on Instagram posts in a way that's genuine, relatable and imparts knowledge. Add value with your comments by giving some facts in a conversational way. Don't be too positive just keep a netural tone. Don't be supportive or compliment the person. Avoid formal language. Don't be a nice guy, just be insightful and relatable. Use conversational phrases and millennial slang where appropriate. Draw on a range of real-life perspectives and your knowledge of alternative supplements. Each comment should be directly relevant to the post, ranging from 2 to 4 sentences. Don't use the person's username in the comment. Don't use exclamation marks. Don't use any hashtags."
+                            user_message = f"Write an insightful comment for an Instagram post with the caption given below. Reply to me only with the comment, nothing else. Don't enclose it in quotes. Don't use exclamation marks. Don't use any hashtags. Caption: {caption}"
+
+                        # Setup prompts for general hashtags
+                        else:
+                            system_message = "You are the social media manager for a brand promoting mental wellness. Your role is to comment on Instagram posts in a way that's genuine and relatable. Don't be too positive just keep a netural tone. Don't be supportive or compliment the person. Avoid formal language. Don't be a nice guy, just be insightful and relatable. Use conversational phrases and millennial slang where appropriate. Draw on a range of real-life perspectives and experiences related to mental wellness. Each comment should be directly relevant to the post, ranging from 2 to 4 sentences. Don't use the person's username in the comment. Don't use exclamation marks. Don't use any hashtags."
+                            user_message = f"Write an engaging comment for an Instagram post with the caption given below. Reply to me only with the comment, nothing else. Don't enclose it in quotes. Don't use exclamation marks. Don't use any hashtags. Caption: {caption}"
+
                         response = client.chat.completions.create(
                             model="gpt-4",
                             messages=[{
-                                "role":
-                                "system",
-                                "content":
-                                "You are the social media manager for a brand promoting mental wellness. Your role is to comment on Instagram posts in a way that's genuine and relatable. Don't be too positive just keep a netural tone. Don't be supportive or compliment the person. Avoid formal language. Don't be a nice guy, just be insightful and relatable. Use conversational phrases and millennial slang where appropriate. Draw on a range of real-life perspectives and experiences related to mental wellness. Each comment should be directly relevant to the post, ranging from 2 to 7 sentences. Don't use the person's username in the comment. Don't use exclamation marks. Don't use any hashtags."
+                                "role": "system",
+                                "content": system_message
                             }, {
-                                "role":
-                                "user",
-                                "content":
-                                f"Write an engaging comment for an Instagram post with the caption given below. Reply to me only with the comment, nothing else. Don't enclose it in quotes. Don't use exclamation marks. Don't use any hashtags. Caption: '{caption}'"
+                                "role": "user",
+                                "content": user_message
                             }])
                         comment = response.choices[0].message.content
                         comment = remove_emojis(comment)
