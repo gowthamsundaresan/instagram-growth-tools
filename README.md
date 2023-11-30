@@ -126,3 +126,13 @@ In case there isn't enough context for GPT-4 to write a comment for a specific p
 
 Update config.ini (Optional)
 It comes loaded with the recommeded settings but feel free to change up the values and experiment.
+
+Contributing
+
+Contributions to this project are welcome! Please follow these steps:
+
+Fork the repository.
+Create a new branch for your feature.
+Commit your changes.
+Push to the branch.
+Open a pull request.
