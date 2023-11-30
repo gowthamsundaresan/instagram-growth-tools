@@ -2,6 +2,7 @@ import os
 import logging
 import random
 import re
+import configparser
 from dotenv import load_dotenv
 from instagrapi import Client as InstagrapiClient
 from instagrapi.exceptions import LoginRequired
@@ -27,24 +28,21 @@ supabase: SupabaseClient = create_client(url, key)
 username = os.environ['INSTAGRAM_USERNAME']
 password = os.environ['INSTAGRAM_PASSWORD']
 
-# Setup action limits
-total_actions = 0
-max_actions = random.choice(35, 50)
+# Load configuration
+config = configparser.ConfigParser()
+config.read('config.ini')
 
-# Setup conditions to perform action on a post
-required_like_count = 100
-required_comment_count = 5
-
-# Setup conditions to fallback to to comments.txt instead of generating comments via GPT-4
-min_caption_length = 200
-
-# Setup prompt for comments on expert hashtags
-expert_system_message = "You are the social media manager for a brand promoting alternative natural supplements. Your role is to comment on Instagram posts in a way that's genuine, relatable and imparts knowledge. Add value with your comments by giving some facts in a conversational way. Don't be too positive just keep a netural tone. Don't be supportive or compliment the person. Avoid formal language. Don't be a nice guy, just be insightful and relatable. Use conversational phrases and millennial slang where appropriate. Draw on a range of real-life perspectives and your knowledge of alternative supplements. Each comment should be directly relevant to the post, ranging from 1 to 2 sentences. Don't use the person's username in the comment. Don't use exclamation marks. Don't use any hashtags."
-expert_user_message = "Write an insightful comment for an Instagram post with the caption given below. Reply to me only with the comment, nothing else. Don't enclose it in quotes. Don't use exclamation marks. Don't use any hashtags. Caption: "
-
-# Setup prompt for comments on general hashtags
-general_system_message = "You are the social media manager for a brand promoting mental wellness. Your role is to comment on Instagram posts in a way that's genuine and relatable. Don't be too positive just keep a netural tone. Don't be supportive or compliment the person. Avoid formal language. Don't be a nice guy, just be insightful and relatable. Use conversational phrases and millennial slang where appropriate. Draw on a range of real-life perspectives and experiences related to mental wellness. Each comment should be directly relevant to the post, ranging from 1 to 2 sentences. Don't use the person's username in the comment. Don't use exclamation marks. Don't use any hashtags."
-general_user_message = "Write an engaging comment for an Instagram post with the caption given below. Reply to me only with the comment, nothing else. Don't enclose it in quotes. Don't use exclamation marks. Don't use any hashtags. Caption: "
+# Read settings
+MAX_ACTIONS = config.getint('Actions', 'max_actions', fallback=45)
+REQUIRED_LIKE_COUNT = config.getint('Actions',
+                                    'required_like_count',
+                                    fallback=100)
+REQUIRED_COMMENT_COUNT = config.getint('Actions',
+                                       'required_comment_count',
+                                       fallback=5)
+MIN_CAPTION_LENGTH = config.getint('Actions',
+                                   'min_caption_length',
+                                   fallback=200)
 
 
 # Function definitions
@@ -59,7 +57,8 @@ def login_user():
 
     Raises:
     -------
-        Exception: If login fails using both session data and username/password.
+        Exception
+            If login fails using both session data and username/password.
     """
 
     # Load session from file if session.json exists
@@ -135,6 +134,37 @@ def read_lines_from_file(file_path):
         return [line.strip() for line in file]
 
 
+def load_prompts(section):
+    """
+    Loads 'system_message' and 'user_message' from 'prompts.txt' for 2 categories of comments (expert and general)
+
+    Parameters:
+    ----------
+        section : str
+            The section name in the configuration file from which to load the prompts. 
+            This parameter specifies the part of the configuration file to be read.
+
+    Returns:
+    -------
+        tuple
+            A tuple containing two elements:
+            - system_message (str): A predefined system message retrieved from the specified section.
+            - user_message (str): A predefined user message retrieved from the specified section.
+
+    Raises:
+    -------
+        KeyError
+            If the specified section or keys ('system_message' or 'user_message') do not exist in the configuration file.
+    """
+    config = configparser.ConfigParser()
+    config.read('prompts.txt')
+
+    system_message = config.get(section, 'system_message')
+    user_message = config.get(section, 'user_message')
+
+    return system_message, user_message
+
+
 def remove_emojis(text):
     """
     Removes all emoji characters from a given string uses a regex.
@@ -167,34 +197,44 @@ def remove_emojis(text):
 
 def growth():
     """
-    Executes the strategy of engaging with Instagram posts through specific hashtags.
-    It iterates through hashtags from hashtags.txt, selects posts at random, screens it for selection and either likes it or posts a comment generated by GPT-4.
-    In case a post doesn't have a caption, the function falls back on choosing a random comment from comments.txt
-
-    The function runs 200 actions and ensures that login is maintained throughout the process.
+    Executes the strategy of engaging with Instagram posts basis given hashtags.
+    It iterates through hashtags from expert_hashtags.txt & general_hashtags.txt, selects posts at random, screens it for selection and chooses to like or post a comment generated by GPT-4.
+    In case a post doesn't have a caption or caption is too short, the function falls back on choosing a random comment from comments.txt
 
     Returns:
     --------
         None. The function operates by interacting with Instagram posts and may output logs.
+
+    Raises:
+    -------
+        LoginRequired
+            If login fails using both session data and username/password.
     """
 
+    total_actions = 0
     cl.delay_range = [1, 3]
     print("Entered hashtag_strategy()")
 
+    # Get prompts for comments on expert hashtags
+    expert_system_message, expert_user_message = load_prompts('expert')
+
+    # Get prompts for comments on general hashtags
+    general_system_message, general_user_message = load_prompts('general')
+
+    # Read comments and randomize them
+    comments = read_lines_from_file('comments.txt')
+    random.shuffle(comments)
+
+    # Get all hashtags, combine and randomize them
+    general_hashtags = read_lines_from_file('general_hashtags.txt')
+    expert_hashtags = read_lines_from_file('expert_hashtags.txt')
+    combined_hashtags = general_hashtags + expert_hashtags
+    random.shuffle(combined_hashtags)
+
     try:
-        # Read comments and randomize them
-        comments = read_lines_from_file('comments.txt')
-        random.shuffle(comments)
-
-        # Get all hashtags, combine and randomize them
-        general_hashtags = read_lines_from_file('general_hashtags.txt')
-        expert_hashtags = read_lines_from_file('expert_hashtags.txt')
-        combined_hashtags = general_hashtags + expert_hashtags
-        random.shuffle(combined_hashtags)
-
         # Iterate over hashtags and comment on 3 random posts for each
         for hashtag in combined_hashtags:
-            if total_actions >= max_actions:
+            if total_actions >= MAX_ACTIONS:
                 break
 
             print(f"Processing hashtag: #{hashtag}")
@@ -231,8 +271,8 @@ def growth():
                     print(f"A past action has been taken on this media")
 
                 # Post selection checks
-                elif (media.like_count > required_like_count
-                      and media.comment_count > required_comment_count):
+                elif (media.like_count > REQUIRED_LIKE_COUNT
+                      and media.comment_count > REQUIRED_COMMENT_COUNT):
                     selected_post = media
                     media_found = True
                     print(
@@ -285,7 +325,7 @@ def growth():
                     cl.delay_range = [3, 5]
 
                     # Fallback to random comment from comments.txt if no caption or caption too short
-                    if not caption or len(caption < min_caption_length):
+                    if not caption or len(caption < MIN_CAPTION_LENGTH):
                         print(
                             f"Commenting on post of ID {media_id} with no caption"
                         )
@@ -345,7 +385,7 @@ def growth():
                 print(f"No suitable media found for #{hashtag}")
 
         # End of session
-        print(f"Reached {max_actions} actions. Let's call it a day.")
+        print(f"Reached {MAX_ACTIONS} actions. Let's call it a day.")
 
     except LoginRequired:
         # Re-login
@@ -354,12 +394,12 @@ def growth():
 
         # Resume strategy
         print("Resuming strategy.")
-        hashtag_strategy()
+        growth()
 
 
 def main():
     """
-    Main function to execute the Instagram engagement script. Performs the login and then starts the hashtag engagement strategy.
+    Main function. Performs the login and then executes the strategy.
 
     Returns:
     --------
