@@ -168,8 +168,8 @@ In case you begin getting rate limited after a few weeks, just delete session.js
 
 Contributions to this project are welcome! Please follow these steps:
 
-Fork the repository.  
-Create a new branch for your feature.  
-Commit your changes.  
-Push to the branch.  
-Open a pull request.
+1. Fork the repository.
+2. Create a new branch for your feature.
+3. Commit your changes.
+4. Push to the branch.
+5. Open a pull request.
