@@ -9,3 +9,7 @@ testing.py
 
 # login session
 session.json
+
+# hashtag files
+expert_hashtags.txt
+general_hashtags.txt

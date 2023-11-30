@@ -32,8 +32,10 @@ password = os.environ['INSTAGRAM_PASSWORD']
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-# Read settings
-MAX_ACTIONS = config.getint('Actions', 'max_actions', fallback=45)
+# Setup config from settings
+MAX_ACTIONS_LOWER = config.getint('Actions', 'max_actions_lower', fallback=35)
+MAX_ACTIONS_UPPER = config.getint('Actions', 'max_actions_upper', fallback=50)
+MAX_ACTIONS = random.randint(MAX_ACTIONS_LOWER, MAX_ACTIONS_UPPER)
 REQUIRED_LIKE_COUNT = config.getint('Actions',
                                     'required_like_count',
                                     fallback=100)
