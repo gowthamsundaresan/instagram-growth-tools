@@ -17,9 +17,13 @@ Also, it's completely free.
 ## Features
 
 1. **Automated Instagram login:** Once you've logged in, the session is stored so that to Instagram it seems like your always opening the app from the same device. Clear session anytime.
+
 2. **Intelligent comment generation:** Uses GPT-4 to create contextually relevant comments. There's also a fallback bank of generic responses in case the identified post doesn't give enough context to write a personalized comment.
+
 3. **General and niche hashtags:** The bot finds and interacts with posts from the hashtags you input. You can input general hashtags, where the bot would typically be more conversational and expert hashtags, where the bot would look to add value and share knowledge on the topic.
+
 4. **Customizable engagement rules:** Configure max actions, like/comment thresholds, generic hastags, niche hashtags, prompts, generic comments and more.
+
 5. **Data persistence:** Stores details about all interactions in a Supabase table.
 
 ## Requirements
