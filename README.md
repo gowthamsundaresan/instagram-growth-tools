@@ -38,20 +38,20 @@ Also, it's completely free.
 
 ## Installation & Setup
 
-### 1. Clone the repo:
+#### 1. Clone the repo:
 
 ```
 git clone https://github.com/gowthamsundaresan/instagram-growth-tools/
 cd instagram-growth-tools
 ```
 
-### 2. Install required Python packages:
+#### 2. Install required Python packages:
 
 ```
 pip install -r requirements.txt
 ```
 
-### 3. Configure environment variables:
+#### 3. Configure environment variables:
 
 Create a .env file in the root directory and update it with your Instagram credentials, OpenAI API key, and Supabase URL and key in the following way
 
@@ -63,7 +63,7 @@ SUPABASE_URL=your_supabase_url
 SUPABASE_KEY=your_supabase_key
 ```
 
-### 4. Create expert_hashtags.txt in root directory:
+#### 4. Create expert_hashtags.txt in root directory:
 
 Populate it with hashtags where your bot will provide knowledgable, insghtful and value-add comments on these posts. For example, if your page is about yoga, you can populate this file like:
 
@@ -78,7 +78,7 @@ forwardfold
 
 Try to populate it with 20-30 hashtags. Don't use the '#' symbol when entering data and put each hashtag in a new line wih no commas.
 
-### 5. Create general_hashtags.txt in root directory:
+#### 5. Create general_hashtags.txt in root directory:
 
 Populate it with hashtags where your bot will provide conversational comments on these posts. For example, if your page is about yoga, you can populate this file like:
 
@@ -93,13 +93,13 @@ mindfulness
 
 Try to populate it with 60-70 hashtags. Don't use the '#' symbol when entering data and put each hashtag in a new line wih no commas.
 
-### 6. Setup Supabase:
+#### 6. Setup Supabase:
 
 Create a table with the following schema
 
 **Table Name**
 
-• Media Actions
+Media Actions
 
 **Columns**
 
@@ -107,7 +107,7 @@ Create a table with the following schema
    • Description: Unique identifier of the Instagram post.  
    • Constraints: Primary Key.
 2. action_type (text)  
-   • Description: Type of action taken on the post (either, 'like' or 'comment').  
+   • Description: Type of action taken on the post (either 'like' or 'comment').  
    • Constraints: None.
 3. action_details (text, optional)  
    • Description: Additional details about the action, such as the text of the comment.  
@@ -132,15 +132,15 @@ created_at timestamp DEFAULT NOW()
 1. Ensure that the table name and column names are exactly as specified.
 2. Disable RLS on Supabase or else set it up on your own and tweak the growth() function in main.py accordingly.
 
-### 7. Update prompts.txt
+#### 7. Update prompts.txt
 
 Update the prompts for general and expert hashtags according to your page, voice and requirements.
 
-### 8. Update comments.txt (Optional)
+#### 8. Update comments.txt (Optional)
 
 In case there isn't enough context for GPT-4 to write a comment for a specific post, we default to this bank of generic comments. It comes loaded with 250+ generic battle-tested comments.
 
-### 9. Update config.ini (Optional)
+#### 9. Update config.ini (Optional)
 
 It comes loaded with the recommeded settings but feel free to change up the values and experiment.
 
