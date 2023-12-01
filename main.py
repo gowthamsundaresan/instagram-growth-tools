@@ -9,8 +9,7 @@ from instagrapi.exceptions import LoginRequired
 from openai import OpenAI
 from supabase import create_client, Client as SupabaseClient
 
-# Init logger and env
-logging.basicConfig(level=logging.ERROR)
+# Init env
 load_dotenv()
 
 # Init Instagrapi
@@ -327,7 +326,7 @@ def growth():
                     cl.delay_range = [3, 5]
 
                     # Fallback to random comment from comments.txt if no caption or caption too short
-                    if not caption or len(caption < MIN_CAPTION_LENGTH):
+                    if not caption or len(caption) < MIN_CAPTION_LENGTH:
                         print(
                             f"Commenting on post of ID {media_id} with no caption"
                         )
