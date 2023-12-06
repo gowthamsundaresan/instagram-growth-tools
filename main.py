@@ -1,5 +1,4 @@
 import os
-import logging
 import random
 import re
 import configparser
@@ -31,7 +30,7 @@ password = os.environ['INSTAGRAM_PASSWORD']
 config = configparser.ConfigParser()
 config.read('config.ini')
 
-# Setup config from settings
+# Setup constants from config
 MAX_ACTIONS_LOWER = config.getint('Actions', 'max_actions_lower', fallback=35)
 MAX_ACTIONS_UPPER = config.getint('Actions', 'max_actions_upper', fallback=50)
 MAX_ACTIONS = random.randint(MAX_ACTIONS_LOWER, MAX_ACTIONS_UPPER)
